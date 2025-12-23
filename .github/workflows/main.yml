@@ -10,13 +10,18 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Debug File Structure
-        run: ls -R # This will show us exactly where the .xcodeproj is in the logs
-
-      - name: Build Archive (Unsigned)
+      - name: Locate and Build
         run: |
+          # 1. Find the project file anywhere in the repo
+          PROJECT_PATH=$(find . -name "FLEXExample.xcodeproj" -print -quit)
+          echo "Found project at: $PROJECT_PATH"
+          
+          # 2. Extract the directory for the build command
+          PROJECT_DIR=$(dirname "$PROJECT_PATH")
+
+          # 3. Build the Archive (STRICTLY UNSIGNED)
           xcodebuild archive \
-            -project Example/FLEXExample.xcodeproj \
+            -project "$PROJECT_PATH" \
             -scheme FLEXExample \
             -configuration Release \
             -archivePath ./build/FLEXExample.xcarchive \
@@ -30,8 +35,9 @@ jobs:
       - name: Package into IPA
         run: |
           mkdir -p Payload
-          # Explicitly find the app bundle and move it
-          cp -r ./build/FLEXExample.xcarchive/Products/Applications/FLEXExample.app Payload/
+          # Find the .app bundle inside the archive products
+          APP_PATH=$(find ./build/FLEXExample.xcarchive -name "*.app" -type d | head -n 1)
+          cp -r "$APP_PATH" Payload/
           zip -r FLEXExample_Unsigned.ipa Payload
 
       - name: Upload IPA
