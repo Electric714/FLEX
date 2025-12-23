@@ -1,0 +1,45 @@
+name: Build Unsigned FLEX Example
+
+on:
+  workflow_dispatch: # Allows you to trigger it manually
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Discover and Build Scheme
+        run: |
+          # 1. Find the exact scheme name for the Example project
+          # We search for anything related to 'Example'
+          SCHEME_NAME=$(xcodebuild -list -project Example/FLEXExample.xcodeproj | grep -m 1 "Example" | xargs)
+          echo "Found scheme: $SCHEME_NAME"
+
+          # 2. Build the Archive without signing
+          xcodebuild archive \
+            -project Example/FLEXExample.xcodeproj \
+            -scheme "$SCHEME_NAME" \
+            -configuration Release \
+            -archivePath ./build/FLEXExample.xcarchive \
+            -sdk iphoneos \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_ENTITLEMENTS="" \
+            CODE_SIGNING_IDENTITY="" \
+            AD_HOC_CODE_SIGNING_ALLOWED=YES
+
+      - name: Create IPA Package
+        run: |
+          mkdir -p Payload
+          # Locate the .app inside the archive and copy it to Payload
+          APP_PATH=$(find ./build/FLEXExample.xcarchive -name "*.app")
+          cp -r "$APP_PATH" Payload/
+          zip -r FLEXExample_Unsigned.ipa Payload
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: Unsigned-FLEX-App
+          path: FLEXExample_Unsigned.ipa
