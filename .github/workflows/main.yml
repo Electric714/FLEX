@@ -1,0 +1,41 @@
+name: Build Unsigned FLEX Example
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Debug File Structure
+        run: ls -R # This will show us exactly where the .xcodeproj is in the logs
+
+      - name: Build Archive (Unsigned)
+        run: |
+          xcodebuild archive \
+            -project Example/FLEXExample.xcodeproj \
+            -scheme FLEXExample \
+            -configuration Release \
+            -archivePath ./build/FLEXExample.xcarchive \
+            -sdk iphoneos \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_ENTITLEMENTS="" \
+            CODE_SIGNING_IDENTITY="" \
+            AD_HOC_CODE_SIGNING_ALLOWED=YES
+
+      - name: Package into IPA
+        run: |
+          mkdir -p Payload
+          # Explicitly find the app bundle and move it
+          cp -r ./build/FLEXExample.xcarchive/Products/Applications/FLEXExample.app Payload/
+          zip -r FLEXExample_Unsigned.ipa Payload
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: Unsigned-FLEX-App
+          path: FLEXExample_Unsigned.ipa
