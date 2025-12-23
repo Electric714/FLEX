@@ -1,52 +1,47 @@
-name: Build Unsigned FLEX Example
+name: Build FLEX Example Unsigned IPA
 
 on:
-  workflow_dispatch:
+  push:
+    branches: [ main ]
+  pull_request:
 
 jobs:
   build:
     runs-on: macos-latest
+
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Locate Project and Build
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+
+      - name: Build FLEXExample (no codesign)
         run: |
-          # 1. Find where the xcodeproj actually is
-          PROJECT_PATH=$(find . -name "FLEXExample.xcodeproj" -print -quit)
-          
-          if [ -z "$PROJECT_PATH" ]; then
-            echo "ERROR: FLEXExample.xcodeproj not found in this repo!"
-            ls -R # Last ditch effort to see where it went
-            exit 1
-          fi
-          
-          echo "Building project at: $PROJECT_PATH"
-
-          # 2. Build the Archive (STRICTLY UNSIGNED)
-          # We use the full path to the project found by 'find'
-          xcodebuild archive \
-            -project "$PROJECT_PATH" \
+          xcodebuild \
+            -project Example/FLEXExample.xcodeproj \
             -scheme FLEXExample \
-            -configuration Release \
-            -archivePath ./build/FLEXExample.xcarchive \
-            -sdk iphoneos \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination 'platform=iOS Simulator,name=iPhone 15' \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_ENTITLEMENTS="" \
-            CODE_SIGNING_IDENTITY="" \
-            AD_HOC_CODE_SIGNING_ALLOWED=YES
+            CODE_SIGN_IDENTITY="" \
+            ONLY_ACTIVE_ARCH=NO \
+            BUILD_DIR=build \
+            build
 
-      - name: Package into IPA
+      - name: Create unsigned IPA
         run: |
-          mkdir -p Payload
-          # Find the .app wherever it was generated
-          APP_PATH=$(find ./build/FLEXExample.xcarchive -name "*.app" -type d | head -n 1)
-          cp -r "$APP_PATH" Payload/
-          zip -r FLEXExample_Unsigned.ipa Payload
+          APP_PATH=$(find build -name "FLEXExample.app" | head -n 1)
 
-      - name: Upload Result
+          mkdir -p Payload
+          cp -R "$APP_PATH" Payload/
+
+          zip -r FLEXExample-unsigned.ipa Payload
+          rm -rf Payload
+
+      - name: Upload IPA artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Unsigned-FLEX-App
-          path: FLEXExample_Unsigned.ipa
+          name: FLEXExample-unsigned-ipa
+          path: FLEXExample-unsigned.ipa
