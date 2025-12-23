@@ -1,0 +1,52 @@
+name: Build Unsigned FLEX Example
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Locate Project and Build
+        run: |
+          # 1. Find where the xcodeproj actually is
+          PROJECT_PATH=$(find . -name "FLEXExample.xcodeproj" -print -quit)
+          
+          if [ -z "$PROJECT_PATH" ]; then
+            echo "ERROR: FLEXExample.xcodeproj not found in this repo!"
+            ls -R # Last ditch effort to see where it went
+            exit 1
+          fi
+          
+          echo "Building project at: $PROJECT_PATH"
+
+          # 2. Build the Archive (STRICTLY UNSIGNED)
+          # We use the full path to the project found by 'find'
+          xcodebuild archive \
+            -project "$PROJECT_PATH" \
+            -scheme FLEXExample \
+            -configuration Release \
+            -archivePath ./build/FLEXExample.xcarchive \
+            -sdk iphoneos \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_ENTITLEMENTS="" \
+            CODE_SIGNING_IDENTITY="" \
+            AD_HOC_CODE_SIGNING_ALLOWED=YES
+
+      - name: Package into IPA
+        run: |
+          mkdir -p Payload
+          # Find the .app wherever it was generated
+          APP_PATH=$(find ./build/FLEXExample.xcarchive -name "*.app" -type d | head -n 1)
+          cp -r "$APP_PATH" Payload/
+          zip -r FLEXExample_Unsigned.ipa Payload
+
+      - name: Upload Result
+        uses: actions/upload-artifact@v4
+        with:
+          name: Unsigned-FLEX-App
+          path: FLEXExample_Unsigned.ipa
